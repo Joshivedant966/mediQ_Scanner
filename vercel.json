@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/medicines/:id", "destination": "/api/medicines?id=:id" },
+    { "source": "/api/medicines",     "destination": "/api/medicines" }
+  ]
+}

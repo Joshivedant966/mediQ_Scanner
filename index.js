@@ -287,8 +287,7 @@ window.addEventListener('scroll', function () {
    Then open: http://127.0.0.1:3000
    ════════════════════════════════════════════════════════ */
 
-// var API_BASE      = '/api';        // relative path — works when served by api.js on any port/host
-var API_BASE = 'http://172.20.193.7:3001/api';
+var API_BASE      = '/api';        // relative path — works when served by api.js on any port/host
 var searchFilter  = 'all';          // current filter pill
 var allMedicines  = [];             // local cache (fetched once on first search)
 var cacheLoaded   = false;
@@ -376,9 +375,7 @@ function showSearchError(msg) {
     '<div class="search-error-icon">⚠️</div>' +
     '<div class="search-error-title">Connection Error</div>' +
     '<div class="search-error-msg">' + escHtml(msg) +
-    '<br><br>Make sure <strong>api.js</strong> is running:<br>' +
-    '<code style="font-family:var(--mono);font-size:13px;color:var(--blue-light);">node api.js</code><br>' +
-    'Then open <strong>http://localhost:3000</strong></div>';
+    '<br><br>Check that <strong>DATABASE_URL</strong> is set in your Vercel Environment Variables.</div>';
 }
 
 /* ─────────────────────── RESULT CARD HTML */
