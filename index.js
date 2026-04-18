@@ -375,13 +375,7 @@ function showSearchError(msg) {
     '<div class="search-error-icon">⚠️</div>' +
     '<div class="search-error-title">Connection Error</div>' +
     '<div class="search-error-msg">' + escHtml(msg) +
-<<<<<<< HEAD
-    '<br><br>Check that <strong>DATABASE_URL</strong> is set in your Vercel Environment Variables.</div>';
-=======
-    '<br><br>Make sure <strong>api.js</strong> is running:<br>' +
-    '<code style="font-family:var(--mono);font-size:13px;color:var(--blue-light);">node api.js</code><br>' +
-    'Then open <strong>http://localhost:3000</strong></div>';
->>>>>>> 852258ec15238e7fc9c5aa45273aacabb64d2aa3
+'<br><br>Check that <strong>DATABASE_URL</strong> is set in your Vercel Environment Variables.</div>';
 }
 
 /* ─────────────────────── RESULT CARD HTML */
