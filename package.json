@@ -4,6 +4,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "pg": "^8.20.0"
+<<<<<<< HEAD
   },
   "name": "timepass",
   "version": "1.0.0",
@@ -16,4 +17,7 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs"
+=======
+  }
+>>>>>>> 852258ec15238e7fc9c5aa45273aacabb64d2aa3
 }
