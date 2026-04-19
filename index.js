@@ -104,18 +104,75 @@ function showInlineResult(text) {
   el.classList.remove('hidden');
   icon.textContent  = '✅';
   title.className   = 'result-title';
-  title.textContent = 'QR Code Successfully Scanned!';
-  var parsed = tryParse(text);
-  var html = '';
-  if (parsed && parsed.length) {
-    html += '<div class="result-data">';
-    parsed.forEach(function (pair) {
-      html += '<div class="result-row"><span class="result-key">' + escHtml(pair[0]) + '</span><span class="result-val">' + escHtml(pair[1]) + '</span></div>';
-    });
-    html += '</div>';
+  title.textContent = 'QR Code Scanned! Searching database…';
+  content.innerHTML = '<div class="result-raw" style="color:var(--text-3);font-size:13px;">ID: ' + escHtml(text) + '</div>';
+
+  // Extract medicine ID from QR text and search database
+  var medId = extractMedicineId(text);
+  searchByQR(medId, content, title);
+}
+
+/* ─────────────────────── EXTRACT MEDICINE ID FROM QR */
+function extractMedicineId(text) {
+  // If QR contains JSON like {"id":"MQ-0001",...}
+  try {
+    var obj = JSON.parse(text);
+    if (obj && obj.id) return obj.id;
+    if (obj && obj.medicineId) return obj.medicineId;
+  } catch (e) {}
+  // If QR is plain medicine ID like "MQ-0001"
+  var match = text.match(/MQ-\d+/i);
+  if (match) return match[0].toUpperCase();
+  // If QR is pipe-separated like "MQ-0001|Medicine Name"
+  var parts = text.split('|');
+  if (parts[0].match(/MQ-\d+/i)) return parts[0].trim().toUpperCase();
+  // Fallback: use the raw text as search query
+  return text.trim();
+}
+
+/* ─────────────────────── SEARCH DB AFTER QR SCAN */
+async function searchByQR(query, contentEl, titleEl) {
+  try {
+    var meds = await fetchAllMedicines();
+    var results = filterMedicines(query, meds);
+
+    if (!results.length) {
+      titleEl.textContent = '⚠️ Medicine Not Found';
+      contentEl.innerHTML =
+        '<div class="result-raw error">No medicine found for ID: <strong>' + escHtml(query) + '</strong></div>' +
+        '<div class="result-raw" style="font-size:13px;margin-top:8px;">Make sure this medicine is registered in the database.</div>';
+      return;
+    }
+
+    var m = results[0]; // show best match
+    titleEl.textContent = '✅ Medicine Found!';
+
+    // Render full detail card in scan result area
+    var st  = medStatus(m);
+    var low = medIsLow(m);
+    var stLbl = st === 'expired' ? 'EXPIRED' : st === 'expiring' ? 'EXPIRING SOON' : 'IN STOCK';
+    var stColor = st === 'expired' ? 'var(--red)' : st === 'expiring' ? 'var(--yellow,orange)' : 'var(--green)';
+
+    contentEl.innerHTML =
+      '<div class="result-data">' +
+        '<div class="result-row"><span class="result-key">Medicine ID</span><span class="result-val" style="font-weight:700;color:var(--blue-light)">' + escHtml(m.id) + '</span></div>' +
+        '<div class="result-row"><span class="result-key">Name</span><span class="result-val">' + escHtml(m.name) + '</span></div>' +
+        '<div class="result-row"><span class="result-key">Category</span><span class="result-val">' + escHtml(m.category || '—') + '</span></div>' +
+        '<div class="result-row"><span class="result-key">Manufacturer</span><span class="result-val">' + escHtml(m.manufacturer || '—') + '</span></div>' +
+        '<div class="result-row"><span class="result-key">Batch No.</span><span class="result-val">' + escHtml(m.batchNumber || '—') + '</span></div>' +
+        '<div class="result-row"><span class="result-key">Expiry Date</span><span class="result-val">' + fmtDate(m.expiryDate) + '</span></div>' +
+        '<div class="result-row"><span class="result-key">Quantity</span><span class="result-val">' + (m.quantity || 0) + ' ' + escHtml(m.unit || '') + (low ? ' ⚠️ LOW' : '') + '</span></div>' +
+        '<div class="result-row"><span class="result-key">Selling Price</span><span class="result-val">' + fmtINR(m.sellingPrice) + '</span></div>' +
+        '<div class="result-row"><span class="result-key">Status</span><span class="result-val" style="color:' + stColor + ';font-weight:600;">' + stLbl + '</span></div>' +
+        (m.description ? '<div class="result-row"><span class="result-key">Description</span><span class="result-val">' + escHtml(m.description) + '</span></div>' : '') +
+      '</div>' +
+      '<button onclick="document.getElementById(\'main-search-input\').value=\'' + escHtml(m.id) + '\';document.getElementById(\'search-section\').scrollIntoView({behavior:\'smooth\'});setTimeout(mainSearch,350);" ' +
+        'style="margin-top:12px;padding:8px 18px;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">View Full Details ↓</button>';
+
+  } catch (err) {
+    titleEl.textContent = '⚠️ Database Error';
+    contentEl.innerHTML = '<div class="result-raw error">Could not connect to database: ' + escHtml(err.message) + '</div>';
   }
-  html += '<div class="result-raw">' + escHtml(text) + '</div>';
-  content.innerHTML = html;
 }
 
 function showInlineError(msg) {
@@ -199,6 +256,7 @@ function showModalResult(text) {
   var raw    = document.getElementById('modal-result-raw');
   var parsed = document.getElementById('modal-result-parsed');
   el.classList.remove('hidden');
+
   if (!text) {
     lbl.textContent = '❌ Could Not Read QR Code';
     lbl.style.color = 'var(--red)';
@@ -206,17 +264,48 @@ function showModalResult(text) {
     parsed.innerHTML = '';
     return;
   }
-  lbl.textContent = '✅ QR Code Detected';
+
+  lbl.textContent = '✅ QR Scanned — Searching database…';
   lbl.style.color = 'var(--green)';
-  raw.textContent = text;
-  var pairs = tryParse(text);
-  if (pairs && pairs.length) {
-    parsed.innerHTML = pairs.map(function (p) {
-      return '<div class="modal-result-row"><span class="modal-result-key">' + escHtml(p[0]) + '</span><span class="modal-result-val">' + escHtml(p[1]) + '</span></div>';
-    }).join('');
-  } else {
-    parsed.innerHTML = '';
-  }
+  raw.textContent = '';
+  parsed.innerHTML = '<div style="color:var(--text-3);font-size:13px;">Looking up: ' + escHtml(text) + '</div>';
+
+  var medId = extractMedicineId(text);
+
+  fetchAllMedicines().then(function(meds) {
+    var results = filterMedicines(medId, meds);
+    if (!results.length) {
+      lbl.textContent = '⚠️ Medicine Not Found';
+      lbl.style.color = 'var(--red)';
+      parsed.innerHTML = '<div style="color:var(--text-3);font-size:13px;">No medicine found for: <strong>' + escHtml(medId) + '</strong></div>';
+      return;
+    }
+    var m = results[0];
+    lbl.textContent = '✅ Medicine Found!';
+    lbl.style.color = 'var(--green)';
+
+    var st = medStatus(m);
+    var low = medIsLow(m);
+    var stLbl = st === 'expired' ? 'EXPIRED' : st === 'expiring' ? 'EXPIRING SOON' : 'IN STOCK';
+    var stColor = st === 'expired' ? 'var(--red)' : st === 'expiring' ? 'orange' : 'var(--green)';
+
+    parsed.innerHTML =
+      '<div class="modal-result-row"><span class="modal-result-key">ID</span><span class="modal-result-val" style="font-weight:700;color:var(--blue-light)">' + escHtml(m.id) + '</span></div>' +
+      '<div class="modal-result-row"><span class="modal-result-key">Name</span><span class="modal-result-val">' + escHtml(m.name) + '</span></div>' +
+      '<div class="modal-result-row"><span class="modal-result-key">Category</span><span class="modal-result-val">' + escHtml(m.category || '—') + '</span></div>' +
+      '<div class="modal-result-row"><span class="modal-result-key">Manufacturer</span><span class="modal-result-val">' + escHtml(m.manufacturer || '—') + '</span></div>' +
+      '<div class="modal-result-row"><span class="modal-result-key">Expiry</span><span class="modal-result-val">' + fmtDate(m.expiryDate) + '</span></div>' +
+      '<div class="modal-result-row"><span class="modal-result-key">Quantity</span><span class="modal-result-val">' + (m.quantity || 0) + ' ' + escHtml(m.unit || '') + (low ? ' ⚠️' : '') + '</span></div>' +
+      '<div class="modal-result-row"><span class="modal-result-key">Price</span><span class="modal-result-val">' + fmtINR(m.sellingPrice) + '</span></div>' +
+      '<div class="modal-result-row"><span class="modal-result-key">Status</span><span class="modal-result-val" style="color:' + stColor + ';font-weight:600;">' + stLbl + '</span></div>' +
+      '<button onclick="closeQRModal();document.getElementById(\'main-search-input\').value=\'' + escHtml(m.id) + '\';document.getElementById(\'search-section\').scrollIntoView({behavior:\'smooth\'});setTimeout(mainSearch,350);" ' +
+        'style="margin-top:12px;width:100%;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">View Full Details ↓</button>';
+
+  }).catch(function(err) {
+    lbl.textContent = '⚠️ Database Error';
+    lbl.style.color = 'var(--red)';
+    parsed.innerHTML = '<div style="font-size:13px;color:var(--text-3);">' + escHtml(err.message) + '</div>';
+  });
 }
 
 /* Close on backdrop click */
