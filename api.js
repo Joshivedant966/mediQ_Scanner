@@ -6,7 +6,7 @@
    1. npm install express pg cors dotenv
    2. Set your Neon connection string (see STEP 1 below)
    3. node api.js
-   4. Open http://localhost:3001
+   4. Open http://localhost:3000
 
    ════════════════════════════════════════════════════════════════ */
 
@@ -16,7 +16,7 @@ const { Pool } = require('pg');
 const cors    = require('cors');
 
 const app  = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 /* ──────────────────────────────────────────────────────────────
    STEP 1 ▶ PASTE YOUR NEON CONNECTION STRING HERE
@@ -61,22 +61,32 @@ app.get('/api/medicines', async (req, res) => {
 
     let sql, params;
 
+    const SELECT_COLS = `
+      id, name, category, unit, manufacturer, supplier, location, quantity, description,
+      batch_number     AS "batchNumber",
+      reorder_level    AS "reorderLevel",
+      purchase_price   AS "purchasePrice",
+      selling_price    AS "sellingPrice",
+      registered_date  AS "registeredDate",
+      manufacture_date AS "manufactureDate",
+      expiry_date      AS "expiryDate"
+    `;
+
     if (q && q.trim()) {
-      // Server-side search across common fields
       const search = `%${q.trim().toLowerCase()}%`;
       sql = `
-        SELECT * FROM ${TABLE_NAME}
+        SELECT ${SELECT_COLS} FROM ${TABLE_NAME}
         WHERE
-          LOWER(name)          LIKE $1 OR
-          LOWER(id)            LIKE $1 OR
-          LOWER(category)      LIKE $1 OR
-          LOWER(manufacturer)  LIKE $1 OR
-          LOWER("batchNumber") LIKE $1
+          LOWER(name)         LIKE $1 OR
+          LOWER(id)           LIKE $1 OR
+          LOWER(category)     LIKE $1 OR
+          LOWER(manufacturer) LIKE $1 OR
+          LOWER(batch_number) LIKE $1
         ORDER BY id ASC
       `;
       params = [search];
     } else {
-      sql    = `SELECT * FROM ${TABLE_NAME} ORDER BY id ASC`;
+      sql    = `SELECT ${SELECT_COLS} FROM ${TABLE_NAME} ORDER BY id ASC`;
       params = [];
     }
 
@@ -97,7 +107,12 @@ app.get('/api/medicines/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT * FROM ${TABLE_NAME} WHERE id = $1 LIMIT 1`,
+      `SELECT id, name, category, unit, manufacturer, supplier, location, quantity, description,
+              batch_number AS "batchNumber", reorder_level AS "reorderLevel",
+              purchase_price AS "purchasePrice", selling_price AS "sellingPrice",
+              registered_date AS "registeredDate", manufacture_date AS "manufactureDate",
+              expiry_date AS "expiryDate"
+       FROM ${TABLE_NAME} WHERE id = $1 LIMIT 1`,
       [id.toUpperCase()]
     );
 
@@ -150,4 +165,3 @@ pool.connect()
     console.error('   Check your DATABASE_URL / connection string in api.js');
     process.exit(1);
   });
-
